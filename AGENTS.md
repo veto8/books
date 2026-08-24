@@ -22,8 +22,24 @@ books/
 ├── poetry.lock
 ├── CORPUS.md            # corpus/dataset reference notes (not code)
 ├── bookworm.svg         # README logo
-└── README.md
+├── AGENTS.md
+└── dockers/
+    └── dockers/
+        ├── docker-compose.yml   # core dev: phoenix + mysql + phpmyadmin
+        ├── dev.yml              # overlay variant with nginx-proxy + static IPs
+        ├── init.sh              # first-run: generates Phoenix app at books/app if missing
+        ├── mix-docker           # run `mix ...` inside the phoenix container
+        └── etc/init-sql/setup.sql
 ```
+
+## Docker dev environment
+- Stack: **Phoenix (myridia/phoenix image) + MySQL 8.0 + phpMyAdmin**
+- MySQL: container `books_mysql`, db `books_dev` (+`books_test`), root password `${MYSQL_ROOT_PASSWORD:-BooksDev2026}`, data volume `mysql_data`
+- Phoenix app lives at `books/app` (mounted as `/app`); auto-generated on first start by `init.sh` (`--no-html --no-gettext`, MyXQL adapter)
+- Run: `cd dockers/dockers && docker-compose up -d` → app on :4000, phpMyAdmin on 127.0.0.1:8080
+- `dev.yml`: alternative with jwilder/nginx-proxy + TLS certs (www.app.local) + fixed subnet 10.7.0.0/16
+- Migrations run automatically at container start (`mix ecto.create && mix ecto.migrate`)
+- Docker commands must be run by the user on the target host (not available in this dev container)
 
 ## Conventions
 - No comments in code unless asked.
