@@ -1,3 +1,5 @@
+<img src="bookworm.svg" alt="Bookworm" width="120">
+
 # extract-text
 
 Extract plain text from **PDF**, **EPUB**, and **MOBI** files.
