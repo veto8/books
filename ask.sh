@@ -81,7 +81,7 @@ task_install() {
 This project's reader app needs Elixir + Erlang. On a Debian 13 host:
 
   sudo apt update
-  sudo apt install -y elixir erlang-dev build-essential libsqlite3-dev
+  sudo apt install -y elixir erlang-dev erlang-xmerl build-essential libsqlite3-dev
 
 Ubuntu alt (use asdf -- the packaged elixir may be older):
 
@@ -90,11 +90,15 @@ Ubuntu alt (use asdf -- the packaged elixir may be older):
     libreadline-dev libtool
   # then: asdf install erlang latest && asdf install elixir latest
 
+erlang-xmerl is needed for the reader's EPUB parsing (installed by default
+with Docker's Elixir). If it is missing, the reader falls back to the
+plain-text download instead.
+
 Run this task again after installing, then pick 7 to start the server.
 EOF
   prompt "Run apt install now? [y/N]" go "N"
   case "$go" in
-    y|Y) run sudo apt update && sudo apt install -y elixir erlang-dev build-essential libsqlite3-dev ;;
+    y|Y) run sudo apt update && sudo apt install -y elixir erlang-dev erlang-xmerl build-essential libsqlite3-dev ;;
     *) info "skipping install" ;;
   esac
 }
