@@ -1,0 +1,89 @@
+services:
+  nginx-proxy:
+    container_name: books_nginx_proxy
+    image: jwilder/nginx-proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./certs/_.app.local:/etc/nginx/certs
+    networks:
+      workgroup:
+        ipv4_address: "10.7.0.2"
+
+  phoenix:
+    container_name: books_phoenix
+    image: myridia/phoenix
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ../../app:/app
+      - ./init.sh:/init.sh
+      - _build:/app/_build
+    command: ["sh", "/init.sh"]
+    environment:
+      - MIX_ENV=dev
+      - DATABASE_URL=ecto://root:${MYSQL_ROOT_PASSWORD:-BooksDev2026}@mysql:3306/books_dev
+      - PHX_HOST=www.app.local
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-BooksDev2026}
+      - VIRTUAL_HOST=www.app.local
+      - VIRTUAL_PORT=4000
+    tty: true
+    stdin_open: true
+    networks:
+      workgroup:
+        ipv4_address: "10.7.0.3"
+
+  mysql:
+    image: mysql:8.0
+    container_name: books_mysql
+    restart: always
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./etc/init-sql/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-BooksDev2026}
+      - MYSQL_DATABASE=books_dev
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      workgroup:
+        ipv4_address: "10.7.0.4"
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: books_phpmyadmin
+    depends_on:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PORT: 3306
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-BooksDev2026}
+      UPLOAD_LIMIT: 100M
+      VIRTUAL_HOST: phpmyadmin.local
+    networks:
+      workgroup:
+        ipv4_address: "10.7.0.5"
+
+
+volumes:
+  _build:
+  mysql_data:
+
+networks:
+  workgroup:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.7.0.0/16
+          gateway: 10.7.0.1
