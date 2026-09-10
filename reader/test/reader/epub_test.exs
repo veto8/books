@@ -10,10 +10,42 @@ defmodule Reader.EpubTest do
       assert {:ok, chapters} = Epub.chapters(epub)
       assert length(chapters) == 2
 
-      assert [%{title: "CHAPTER I.", paragraphs: [_ | _] = paras}, %{title: "CHAPTER II."}] =
-               chapters
+      assert [
+               %{title: "CHAPTER I.", blocks: [_ | _] = blocks},
+               %{title: "CHAPTER II.", blocks: [_ | _]}
+             ] = chapters
 
-      assert Enum.join(paras, " ") =~ "stormy night"
+      paragraphs = for {:paragraph, text} <- blocks, do: text
+      assert Enum.join(paragraphs, " ") =~ "stormy night"
+    end
+
+    test "extracts images embedded in a chapter document" do
+      base = make_epub_dir()
+
+      File.mkdir_p!(Path.join(base, "OEBPS/images"))
+
+      File.write!(
+        Path.join(base, "OEBPS/images/moon.png"),
+        <<137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82>>
+      )
+
+      File.write!(
+        Path.join(base, "OEBPS/ch1.html"),
+        ~s(<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml"><body><h2>CHAPTER I.</h2><p>See the moon.</p><img src="images/moon.png" alt="The Moon"/></body></html>)
+      )
+
+      epub = zip_epub(base)
+
+      assert {:ok, [%{blocks: blocks}]} = Epub.chapters(epub)
+
+      assert {
+               :image,
+               %{path: path, alt: alt, media_type: "image/png", binary: binary}
+             } = Enum.find(blocks, &match?({:image, _}, &1))
+
+      assert path =~ "images/moon.png"
+      assert alt == "The Moon"
+      assert byte_size(binary) == 16
     end
 
     test "falls back to a single untitled chapter when a document has no heading" do
@@ -26,7 +58,7 @@ defmodule Reader.EpubTest do
 
       epub = zip_epub(base)
 
-      assert {:ok, [%{title: "Just prose.", paragraphs: ["Just prose."]}]} =
+      assert {:ok, [%{title: "Just prose.", blocks: [{:paragraph, "Just prose."}]}]} =
                Epub.chapters(epub)
     end
 
