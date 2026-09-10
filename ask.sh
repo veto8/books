@@ -117,6 +117,19 @@ task_server() {
   fi
 }
 
+task_clean() {
+  if need_mix; then
+    info "cleaning compiled files (mix clean)..."
+    (cd "$READER_DIR" && mix clean)
+  else
+    info "mix is not installed on this host."
+    task_install
+  fi
+  info "removing _build for a fresh compile..."
+  rm -rf "$READER_DIR/_build"
+  info "done."
+}
+
 task_catalog() {
   title "Catalog sources"
   printf '  1) Download official catalog.csv.gz (one file)\n'
@@ -145,6 +158,7 @@ menu() {
     printf '  %sReader app%s\n' "$cyan" "$reset"
     printf '  7) run the reader webapp\n'
     printf '  8) install Elixir (host setup)\n'
+    printf '  9) clean compiled files (fresh build)\n'
     printf '\n'
     printf '  0) quit\n'
     printf '\n'
@@ -158,6 +172,7 @@ menu() {
       6) task_catalog ;;
       7) task_server ;;
       8) task_install ;;
+      9) task_clean ;;
       0) echo "bye"; exit 0 ;;
       *) printf 'unknown choice: %s\n' "$choice" ;;
     esac
@@ -175,9 +190,10 @@ if [ $# -gt 0 ]; then
     server)     task_server ;;
     catalog)    task_catalog ;;
     install)    task_install ;;
+    clean)      task_clean ;;
     help|--help|-h)
       echo "usage: ./ask.sh [task]"
-      echo "tasks: search | random | book | download | convert | catalog | server | install | help"
+      echo "tasks: search | random | book | download | convert | catalog | server | install | clean | help"
       exit 0
       ;;
     *) die "unknown task: $task (run ./ask.sh help)" ;;
