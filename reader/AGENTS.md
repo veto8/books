@@ -448,35 +448,22 @@ And **never** do this:
 
 <!-- usage-rules-end -->
 
-## Known issue: `KeyError :blocks not found` on `/read/:id`
+## Known issue: KeyError :blocks not found on /read/:id (RESOLVED)
 
-`Reader.Text.prepare/2` turns a txt chapter map `%{title, paragraphs}` into
-`%{chapter | blocks: ...}`. On a plain map this **adds** the `:blocks` key and
-cannot raise `KeyError`. The error only appears when the running BEAM is stale:
+The root cause was twofold:
+1. Old Gutenberg EPUBs (e.g. book #1) put all content in `pg-header`, which was
+   in `@skip_ids`. After filtering, the spine was empty → fell back to TXT path.
+2. A stale BEAM could have a `prepare/2` that reads `chapter.blocks` instead
+   of building it via map update.
 
-- The trace (`text.ex:194/255/256`) matches the current source's line numbers,
-  but the loaded module was compiled from an intermediate edit that *read*
-  `chapter.blocks` instead of building it.
-- Symptom: `Task ... terminating`, `** (KeyError) key :blocks not found`,
-  repeatedly on every mount of `/read/:id`.
+**Fix applied:**
+- `epub.ex`: When all spine items are skipped, fall back to processing
+  everything except `coverpage-wrapper` (keeps `pg-header` content).
+- `text.ex`: `prepare/2` now uses `Map.get(chapter, :paragraphs, [])` instead
+  of pattern matching, so it never assumes `:blocks` exists.
 
-### Fix
+### If KeyError still appears
 Always apply a full clean recompile and restart the BEAM node:
 1. `./ask.sh clean` (runs `mix clean` + `rm -rf _build`) — menu item 9.
 2. `./ask.sh server` (or `mix phx.server`) and confirm boot shows
    `Compiling ... lib/reader/text.ex`.
-
-### Diagnosing which beam is loaded
-- Fresh dev beam: `_build/dev/lib/reader/ebin/Elixir.Reader.Text.beam` (mtime
-  must be newer than `lib/reader/text.ex`). The `_build/test` one is frequently
-  stale (predates image support) and must not be served.
-- If the server's port `:4000` is up but `ps -ef | grep beam.smp` shows no
-  process, the app is running inside a Docker container or on another machine — a
-  copy of its own. Verify with `docker ps` / `ip -br addr` before editing files;
-  edits only take effect on the machine whose `_build` is touched.
-- `KeyError` on a live server + matching line numbers + correct source on disk ⇒
-  stale module in memory: kill the node (`sudo pkill -9 -f beam.smp`), clean,
-  recompile, restart.
-
-The server is typically served at `http://192.168.43.2:4000` (Android tethering
-IP); the site only works when the BEAM node on that host is up.

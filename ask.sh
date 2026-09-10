@@ -130,6 +130,40 @@ task_clean() {
   info "done."
 }
 
+task_cache() {
+  title "Clean all cache"
+  printf 'This will remove:\n'
+  printf '  - reader/_build (compiled BEAM files)\n'
+  printf '  - reader/deps (downloaded dependencies)\n'
+  printf '  - reader/tmp/* (runtime temp files)\n'
+  printf '  - reader/*.db-shm, *.db-wal (SQLite journal files)\n'
+  printf '\n'
+  prompt "Proceed? [y/N]" go "N"
+  case "$go" in
+    y|Y) ;;
+    *) info "cancelled"; return ;;
+  esac
+
+  if need_mix; then
+    info "running mix clean..."
+    (cd "$READER_DIR" && mix clean 2>/dev/null) || true
+  fi
+
+  info "removing _build/..."
+  rm -rf "$READER_DIR/_build"
+
+  info "removing deps/..."
+  rm -rf "$READER_DIR/deps"
+
+  info "removing tmp/..."
+  rm -rf "$READER_DIR/tmp"
+
+  info "removing SQLite journal files..."
+  find "$READER_DIR" -maxdepth 1 -name '*.db-shm' -o -name '*.db-wal' -o -name '*.db-journal' | xargs -r rm -f
+
+  info "all cache cleared."
+}
+
 task_catalog() {
   title "Catalog sources"
   printf '  1) Download official catalog.csv.gz (one file)\n'
@@ -159,6 +193,7 @@ menu() {
     printf '  7) run the reader webapp\n'
     printf '  8) install Elixir (host setup)\n'
     printf '  9) clean compiled files (fresh build)\n'
+    printf '  10) clean all cache (build + deps + tmp + sqlite journals)\n'
     printf '\n'
     printf '  0) quit\n'
     printf '\n'
@@ -173,6 +208,7 @@ menu() {
       7) task_server ;;
       8) task_install ;;
       9) task_clean ;;
+      10) task_cache ;;
       0) echo "bye"; exit 0 ;;
       *) printf 'unknown choice: %s\n' "$choice" ;;
     esac
@@ -191,9 +227,10 @@ if [ $# -gt 0 ]; then
     catalog)    task_catalog ;;
     install)    task_install ;;
     clean)      task_clean ;;
+    cache)      task_cache ;;
     help|--help|-h)
       echo "usage: ./ask.sh [task]"
-      echo "tasks: search | random | book | download | convert | catalog | server | install | clean | help"
+      echo "tasks: search | random | book | download | convert | catalog | server | install | clean | cache | help"
       exit 0
       ;;
     *) die "unknown task: $task (run ./ask.sh help)" ;;
